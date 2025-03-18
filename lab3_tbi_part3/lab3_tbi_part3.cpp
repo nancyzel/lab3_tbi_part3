@@ -26,7 +26,7 @@ static void CheckIfCurrentSymbolIsAcceptable() {
 	}
 }
 
-static void GetResultExpression(SyntaxElementsTree* currentTree);
+static void GetResultExpression(SyntaxElementsTree* currentNode);
 
 static void GoToNextSymbol() {
 	if (currentSymbolIndex < inputString.length() - 1) {
@@ -93,7 +93,7 @@ static void GetNumber() {
 /// <summary>
 /// правило для считывания выражения Factor, являющегося либо числом, либо строкой, либо выражением в скобках
 /// </summary>
-static void GetFactor(SyntaxElementsTree* currentTree) {
+static void GetFactor(SyntaxElementsTree* currentNode) {
 	if (TellIfLetter()) {
 		GetString();
 	}
@@ -151,48 +151,67 @@ static void GetFactor(SyntaxElementsTree* currentTree) {
 /// <summary>
 /// правило для считывания выражения AddedExpression, состоящего из выражений, произведение значений которых необходимо найти
 /// </summary>
-static void GetAddedExpression() {
-	GetFactor();
+static void GetAddedExpression(SyntaxElementsTree* currentNode) {
+	currentNode = null;
+	SyntaxElementsTree* leftNode;
+	SyntaxElementsTree* rightNode;
+
+	GetFactor(leftNode);
 	CheckIfCurrentSymbolIsAcceptable();
 	while (currentSymbol == '*'
 		|| currentSymbol == '/') {
+		CreateNode(currentNode, currentSymbol);
+		&currentNode.left = leftNode;
 		GoToNextSymbol();
-		GetFactor();
+		GetFactor(rightNode);
+		&currentNode.right = rightNode;
+		leftNode = currentNode;
 	}
 }
 
 /// <summary>
 /// правило для считывания выражения ComparedCondition, состоящего из выражений, складываемых друг с другом
 /// </summary>
-static void GetComparedCondition() {
-	GetAddedExpression();
+static void GetComparedCondition(SyntaxElementsTree* currentNode) {
+	currentNode = null;
+	SyntaxElementsTree* leftNode;
+	SyntaxElementsTree* rightNode;
+	GetAddedExpression(leftNode);
 	CheckIfCurrentSymbolIsAcceptable();
 	while (currentSymbol == '+'
 		|| currentSymbol == '-') {
+		CreateNode(currentNode, currentSymbol);
+		&currentNode.left = leftNode;
 		GoToNextSymbol();
-		GetAddedExpression();
+		GetAddedExpression(rightNode);
+		leftNode = currentNode;
 	}
 }
 
 /// <summary>
 /// правило для считывания выражения-условия ContrCondition, состоящего из выражений, сравниваемых друг с другом
 /// </summary>
-static void GetContrCondition() {
-	GetComparedCondition();
+static void GetContrCondition(SyntaxElementsTree* currentNode) {
+	currentNode = null;
+	SyntaxElementsTree* leftNode;
+	SyntaxElementsTree* rightNode;
+	GetComparedCondition(leftNode);
 	CheckIfCurrentSymbolIsAcceptable();
 	while (currentSymbol == '='
 		|| currentSymbol == '<'
 		|| currentSymbol == '>') {
 		doesExpressionContainCondition = true;
+		CreateNode(currentNode, currentSymbol);
 		GoToNextSymbol();
-		GetComparedCondition();
+		GetComparedCondition(rightNode);
+		leftNode = currentNode;
 	}
 }
 
 /// <summary>
 /// правило для считывания выражения-условия AndCondition, состоящего из условия с союзом НЕ
 /// </summary>
-static void GetAndCondition() {
+static void GetAndCondition(SyntaxElementsTree* currentNode) {
 	if (currentSymbol == '!') {
 		doesExpressionContainCondition = false;
 		GoToNextSymbol();
@@ -211,13 +230,18 @@ static void GetAndCondition() {
 /// <summary>
 /// правило для считывания выражения-условия OrCondition, состоящего из условий с союзом И
 /// </summary>
-static void GetOrCondition() {
-	GetAndCondition();
+static void GetOrCondition(SyntaxElementsTree* currentNode) {
+	currentNode = null;
+	SyntaxElementsTree* leftNode;
+	SyntaxElementsTree* rightNode;
+	GetAndCondition(leftNode);
 	CheckIfCurrentSymbolIsAcceptable();
 	while (currentSymbol == '&') {
 		doesExpressionContainCondition = false;
+		CreateNode(currentNode, currentSymbol);
 		GoToNextSymbol();
-		GetAndCondition();
+		GetAndCondition(rightNode);
+		leftNode = currentNode;
 		if (!doesExpressionContainCondition) {
 			throw std::invalid_argument(std::string("Ошибка при написании выражения: логические операторы '&', '|' и '!' могут применяться только к выражениям, в которых есть сравнение"));
 		}
@@ -227,13 +251,18 @@ static void GetOrCondition() {
 /// <summary>
 /// правило для считывания целого выражения ResultExpression, состоящего из условий с союзом ИЛИ
 /// </summary>
-static void GetResultExpression() {
-	GetOrCondition();
+static void GetResultExpression(SyntaxElementsTree* currentNode) {
+	currentNode = null;
+	SyntaxElementsTree* leftNode;
+	SyntaxElementsTree* rightNode;
+	GetOrCondition(leftNode);
 	CheckIfCurrentSymbolIsAcceptable();
 	while (currentSymbol == '|') {
 		doesExpressionContainCondition = false;
+		CreateNode(currentNode, currentSymbol);
 		GoToNextSymbol();
-		GetOrCondition();
+		GetOrCondition(rightNode);
+		leftNode = currentNode;
 		if (!doesExpressionContainCondition) {
 			throw std::invalid_argument(std::string("Ошибка при написании выражения: логические операторы '&', '|' и '!' могут применяться только к выражениям, в которых есть сравнение"));
 		}
@@ -245,13 +274,13 @@ int main()
 {
 	SetConsoleOutputCP(65001);
 	SetConsoleCP(65001);
-
+	SyntaxElementsTree currentTree;
 	try {
 		std::cout << "Введите строку с арифметическим выражением. \nНе используйте пробелы и табуляцию, для дробной части вещественных чисел используйте символ запятой." << std::endl;
 		std::cin >> inputString;
 		currentSymbol = inputString[0];
 		//std::cout << inputString << std::endl;
-		GetResultExpression();
+		GetResultExpression(currentTree);
 	}
 	catch (std::invalid_argument& exception) {
 		std::cout << exception.what() << std::endl;
